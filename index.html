@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistem E-SP2D - Dinas Pariwisata</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+    .toast-animate { animation: slideIn 0.3s ease forwards, fadeOut 0.3s ease 3.7s forwards; }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { transform: translateX(0); opacity: 1; } }
+    #main-sidebar { transition: transform 0.3s ease-in-out, width 0.3s ease-in-out; }
+    @media print {
+      aside, #auth-container, #loading, #toast-container, #btn-trigger-modal, #form-input-lra, #modal-form, .border-b.p-4.flex.flex-col, button, input { display: none !important; }
+      main { width: 100% !important; padding: 0 !important; margin: 0 !important; }
+    }
+  </style>
+</head>
+<body class="text-slate-800 h-screen overflow-hidden">
+
+  <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-30 hidden md:hidden backdrop-blur-sm" onclick="toggleSidebar()"></div>
+  <div id="toast-container" class="fixed top-5 right-5 z-50 space-y-3 pointer-events-none"></div>
+
+  <!-- LOADING OVERLAY (Hanya untuk Login/Simpan) -->
+  <div id="loading" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-4 border-indigo-600 mb-4"></div>
+      <p class="text-sm font-semibold text-slate-600" id="loading-text">Memproses...</p>
+    </div>
+  </div>
+
+  <div id="auth-container" class="flex-grow flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md p-8 rounded-3xl shadow-xl border border-slate-100">
+      <div class="flex justify-center mb-6"><h2 class="text-xl font-bold text-indigo-600">Masuk Sistem E-SP2D</h2></div>
+      <form id="form-login" onsubmit="handleLogin(event)" class="space-y-5">
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Username</label>
+          <input type="text" id="login-username" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="Username">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Password</label>
+          <input type="password" id="login-password" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="••••••••">
+        </div>
+        <button type="submit" class="w-full py-3.5 bg-indigo-600 text-white font-semibold rounded-xl text-sm shadow-lg">Masuk Sistem</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="app-container" class="hidden h-screen w-full flex flex-col md:flex-row overflow-hidden">
+    <aside id="main-sidebar" class="fixed top-0 left-0 h-screen w-64 bg-slate-900 text-slate-300 flex flex-col justify-between border-r border-slate-800 z-40 -translate-x-full md:relative md:translate-x-0 md:w-64 md:h-full">
+      <div class="p-6 overflow-y-auto">
+        <div class="flex items-center justify-between mb-8">
+          <div class="flex items-center space-x-3">
+            <div class="p-2 bg-indigo-600 rounded-xl text-white"><i class="bi bi-wallet2 text-xl"></i></div>
+            <div><h1 class="font-bold text-white text-md sidebar-logo-text">E-SP2D</h1></div>
+          </div>
+          <button onclick="toggleSidebar()" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition-colors md:hidden"><i class="bi bi-x-lg text-xl"></i></button>
+        </div>
+        <nav id="sidebar-menu" class="space-y-1"></nav>
+      </div>
+      <div class="p-4 border-t border-slate-800 bg-slate-950/40 flex items-center justify-between flex-shrink-0">
+        <div><p class="text-sm font-semibold text-white" id="label-user-nama">Operator</p></div>
+        <button onclick="handleLogout()" class="text-slate-400 hover:text-red-400"><i class="bi bi-box-arrow-right text-lg"></i></button>
+      </div>
+    </aside>
+
+    <main class="flex-grow h-full overflow-y-auto p-6 md:p-8 w-full relative z-10">
+      <div class="flex items-center justify-between mb-6 md:hidden">
+        <button onclick="toggleSidebar()" class="text-slate-600 hover:text-slate-900 p-2 rounded-lg hover:bg-slate-100"><i class="bi bi-list text-2xl"></i></button>
+        <h2 id="current-menu-title-mobile" class="text-lg font-bold text-slate-900">Dashboard</h2>
+        <div class="w-10"></div>
+      </div>
+
+      <div id="dashboard-header-title-block" class="hidden md:flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div><h2 id="current-menu-title" class="text-xl font-bold text-slate-900">Dashboard</h2></div>
+        <div class="flex items-center space-x-3 ml-auto">
+          <button onclick="cetakLaporan()" class="px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl shadow-md hover:bg-emerald-700"><i class="bi bi-printer"></i> <span class="hidden sm:inline">Cetak Laporan</span></button>
+          <button id="btn-trigger-modal" onclick="openInputModal()" class="px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl shadow-md hover:bg-indigo-700"><i class="bi bi-plus-lg"></i> <span class="hidden sm:inline">Tambah Record</span></button>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-4 border-b flex flex-col sm:flex-row justify-between bg-slate-50/50 items-start sm:items-center gap-3">
+          <div id="lra-date-filter-panel" class="flex items-center gap-2 hidden w-full sm:w-auto flex-wrap">
+            <label class="text-xs font-bold text-slate-500">PERIODE:</label>
+            <input type="date" id="filter-start-date" class="border border-slate-300 p-1.5 text-xs rounded-lg">
+            <span class="text-xs text-slate-400">s/d</span>
+            <input type="date" id="filter-end-date" class="border border-slate-300 p-1.5 text-xs rounded-lg">
+            <button onclick="applyLraServerFilter()" class="bg-indigo-600 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm hover:bg-indigo-700">Terapkan Filter</button>
+          </div>
+          <div id="generic-table-title" class="text-xs font-bold uppercase text-slate-400">Data Grid</div>
+          <input type="text" id="table-search" oninput="applyLocalSearch()" class="border p-1.5 text-xs rounded-lg w-full sm:w-48" placeholder="Cari...">
+        </div>
+        
+        <!-- AREA TABEL DENGAN LOADING SPINNER INTERNAL -->
+        <div class="relative overflow-x-auto max-h-[calc(100vh-280px)]">
+          <div id="table-loading-spinner" class="hidden absolute inset-0 bg-white/80 z-20 flex items-center justify-center">
+            <div class="flex flex-col items-center">
+              <div class="animate-spin rounded-full h-10 w-10 border-b-4 border-indigo-600 mb-2"></div>
+              <p class="text-xs font-semibold text-slate-600">Memuat Data...</p>
+            </div>
+          </div>
+          <table class="w-full text-left" id="data-table"><thead></thead><tbody></tbody></table>
+        </div>
+        <div id="empty-state" class="hidden p-12 text-center text-slate-400 text-xs">Data tidak ditemukan.</div>
+      </div>
+    </main>
+  </div>
+
+  <div id="modal-form" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-40 flex items-center justify-center hidden p-4">
+    <div class="bg-white w-full max-w-xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
+      <div class="p-5 border-b flex justify-between items-center">
+        <h3 class="text-md font-bold text-slate-900" id="modal-title">Form Input</h3>
+        <button onclick="closeInputModal()" class="text-slate-400 hover:text-slate-600"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <form id="dynamic-form" onsubmit="handleFormSubmit(event)" class="overflow-y-auto p-6 space-y-4">
+        <input type="hidden" id="form-row-index" name="ROW_INDEX" value="">
+        <div id="form-fields-container" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        <div class="border-t pt-4 flex justify-end space-x-2">
+          <button type="button" onclick="closeInputModal()" class="px-4 py-2 bg-slate-100 text-xs font-semibold rounded-xl hover:bg-slate-200">Batal</button>
+          <button type="submit" class="px-5 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl hover:bg-indigo-700">Simpan Data</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // STATE MANAGEMENT
+    let cacheBulkPackage = { 
+      sheetNames: [], 
+      structure: {}, 
+      databasePejabat: [], 
+      metaKop: {}, 
+      allContent: {}, // Ini akan diisi secara bertahap (lazy)
+      listJenisSp2d: [] 
+    };
+    let currentActiveMenu = '';
+
+    // ==================================================
+    // UTILITIES
+    // ==================================================
+    function showLoading(show, text = "Memproses...") { 
+      document.getElementById('loading-text').innerText = text;
+      document.getElementById('loading').classList.toggle('hidden', !show); 
+    }
+
+    function showTableLoading(show) {
+      document.getElementById('table-loading-spinner').classList.toggle('hidden', !show);
+    }
+
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast-animate flex items-center p-4 rounded-xl text-white shadow-xl ${type==='error'?'bg-rose-500':'bg-emerald-500'} text-xs font-semibold min-w-[250px]`;
+      toast.innerHTML = `<div class="flex-grow">${message}</div>`;
+      container.appendChild(toast);
+      setTimeout(() => { toast.remove(); }, 4000);
+    }
+
+    function handleLogout() { 
+      localStorage.removeItem('sp2d_user_session'); 
+      cacheBulkPackage = { sheetNames: [], structure: {}, databasePejabat: [], metaKop: {}, allContent: {}, listJenisSp2d: [] };
+      document.getElementById('app-container').classList.add('hidden');
+      document.getElementById('auth-container').classList.remove('hidden');
+      showToast("Anda telah keluar.", "success");
+    }
+
+    window.onload = function() {
+      const savedUser = localStorage.getItem('sp2d_user_session');
+      if (savedUser) { 
+        setupUserDashboard(JSON.parse(savedUser)); 
+      } else { 
+        showLoading(false); 
+      }
+    };
+
+    // ==================================================
+    // LOGIN FLOW (OPTIMIZED)
+    // ==================================================
+    function handleLogin(event) {
+      event.preventDefault();
+      showLoading(true, "Memvalidasi Akun...");
+      
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if(res.success) { 
+            localStorage.setItem('sp2d_user_session', JSON.stringify(res.user)); 
+            showLoading(true, "Menyiapkan Dashboard...");
+            
+            // PANGGIL FUNGSI RINGAN (Bukan getAllSheetsBulkData)
+            google.script.run
+              .withSuccessHandler(function(essRes) {
+                if(essRes.success) {
+                  const ess = essRes.data;
+                  // Simpan data ringan
+                  cacheBulkPackage.sheetNames = ess.sheetNames;
+                  cacheBulkPackage.structure = ess.structure;
+                  cacheBulkPackage.metaKop = ess.metaKop;
+                  cacheBulkPackage.databasePejabat = ess.databasePejabat;
+                  cacheBulkPackage.listJenisSp2d = ess.listJenisSp2d;
+                  
+                  // Setup UI
+                  if(cacheBulkPackage.metaKop.d5) document.getElementById('filter-start-date').value = cacheBulkPackage.metaKop.d5;
+                  if(cacheBulkPackage.metaKop.d6) document.getElementById('filter-end-date').value = cacheBulkPackage.metaKop.d6;
+                  
+                  buildSidebarMenu();
+                  setupUserDashboard(res.user);
+                } else {
+                  showLoading(false);
+                  showToast(essRes.message, "error");
+                }
+              })
+              .withFailureHandler(err => { showLoading(false); showToast("Gagal memuat dashboard", "error"); })
+              .getDashboardEssentials();
+          } else { 
+            showLoading(false); 
+            showToast(res.message, "error"); 
+          }
+        })
+        .withFailureHandler(err => { showLoading(false); showToast("Koneksi Error", "error"); })
+        .loginUser(document.getElementById('login-username').value, document.getElementById('login-password').value);
+    }
+
+    function setupUserDashboard(user) {
+      document.getElementById('auth-container').classList.add('hidden');
+      document.getElementById('app-container').classList.remove('hidden');
+      document.getElementById('label-user-nama').innerText = user.nama;
+      showLoading(false);
+      
+      // Langsung buka menu default (LRA)
+      // switchMenu akan menangani pengambilan datanya secara lazy
+      if (cacheBulkPackage.sheetNames.length > 0) {
+         switchMenu("LRA"); 
+      }
+    }
+
+    // ==================================================
+    // NAVIGATION & LAZY LOADING
+    // ==================================================
+    function buildSidebarMenu() {
+      const sidebar = document.getElementById('sidebar-menu');
+      sidebar.innerHTML = '';
+      const urutanMenuManual = ["DATABASE", "DATA SP2D", "PENGURANG BELANJA", "LRA", "REKAP SP2D"];
+      
+      // Gabungkan urutan manual dengan sheet yang ada
+      const urutanFinal = [...urutanMenuManual];
+      cacheBulkPackage.sheetNames.forEach(name => {
+        if (!urutanFinal.map(m => m.toUpperCase().trim()).includes(name.toUpperCase().trim())) {
+          urutanFinal.push(name);
+        }
+      });
+
+      urutanFinal.forEach(sheetName => {
+        const sheetCocok = cacheBulkPackage.sheetNames.find(name => name.toUpperCase().trim() === sheetName.toUpperCase().trim());
+        if (!sheetCocok) return; 
+        
+        const btn = document.createElement('button');
+        btn.id = `menu-item-${sheetCocok}`; 
+        btn.onclick = () => {
+          switchMenu(sheetCocok);
+          if (window.innerWidth < 768) { toggleSidebar(); }
+        };
+        btn.className = `w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:bg-slate-800/60 hover:text-white mb-1 transition-colors`;
+        
+        let iconClass = "bi bi-file-earmark-text";
+        const nameUpper = sheetCocok.toUpperCase().trim();
+        if (nameUpper === "DATABASE") iconClass = "bi bi-database";
+        else if (nameUpper === "DATA SP2D") iconClass = "bi bi-wallet2";
+        else if (nameUpper === "PENGURANG BELANJA") iconClass = "bi bi-dash-circle-fill text-rose-400";
+        else if (nameUpper === "LRA") iconClass = "bi bi-journal-check text-amber-400";
+        else if (nameUpper === "REKAP SP2D") iconClass = "bi bi-collection-play-fill text-indigo-400";
+        
+        btn.innerHTML = `<i class="${iconClass} text-lg flex-shrink-0"></i><span class="sidebar-text truncate">${sheetCocok}</span>`;
+        sidebar.appendChild(btn);
+      });
+    }
+
+    function switchMenu(sheetName) {
+      currentActiveMenu = sheetName;
+      const isLra = sheetName.toUpperCase().trim() === 'LRA';
+      const isRekap = sheetName.toUpperCase().trim() === 'REKAP SP2D';
+
+      // Update UI Sidebar
+      cacheBulkPackage.sheetNames.forEach(name => {
+        const item = document.getElementById(`menu-item-${name}`);
+        if(item) {
+          item.className = (name === sheetName) 
+            ? `w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-semibold bg-indigo-600 text-white mb-1 shadow-md`
+            : `w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:bg-slate-800/60 hover:text-white mb-1 transition-colors`;
+        }
+      });
+
+      // Update Header & Buttons
+      document.getElementById('current-menu-title').innerText = sheetName;
+      const mobileTitle = document.getElementById('current-menu-title-mobile');
+      if (mobileTitle) mobileTitle.innerText = sheetName;
+      
+      const btnTrigger = document.getElementById('btn-trigger-modal');
+      if (isLra) {
+        btnTrigger.classList.remove('hidden');
+        btnTrigger.innerHTML = `<i class="bi bi-box-arrow-up-right"></i> <span class="hidden sm:inline">Input via Spreadsheet</span>`;
+      } else if (isRekap) {
+        btnTrigger.classList.add('hidden'); 
+      } else {
+        btnTrigger.classList.remove('hidden');
+        btnTrigger.innerHTML = `<i class="bi bi-plus-lg"></i> <span class="hidden sm:inline">Tambah Record</span>`;
+      }
+
+      document.getElementById('lra-date-filter-panel').classList.toggle('hidden', !(isLra || isRekap));
+      document.getElementById('generic-table-title').classList.toggle('hidden', (isLra || isRekap));
+      document.getElementById('table-search').value = '';
+
+      // LOGIC LAZY LOADING
+      showTableLoading(true);
+      document.getElementById('data-table').innerHTML = '<thead></thead><tbody></tbody>'; // Kosongkan tabel dulu
+
+      if (isLra) {
+        // LRA Butuh Data: LRA, SP2D, PENGURANG
+        // Cek apakah kita sudah punya data LRA di cache?
+        if (cacheBulkPackage.allContent["LRA"] && cacheBulkPackage.allContent["DATA SP2D"]) {
+           renderLraView();
+           showTableLoading(false);
+        } else {
+           // Ambil paket lengkap untuk LRA
+           google.script.run
+             .withSuccessHandler(function(res) {
+               if(res.success) {
+                 // Simpan semua data paket ke cache
+                 Object.assign(cacheBulkPackage.allContent, res.data);
+                 renderLraView();
+               } else {
+                 showToast(res.message, "error");
+               }
+               showTableLoading(false);
+             })
+             .withFailureHandler(err => { showTableLoading(false); showToast("Gagal memuat LRA", "error"); })
+             .getLraDependencies();
+        }
+      } else if (isRekap) {
+        // Rekap Butuh Data: SP2D
+        if (cacheBulkPackage.allContent["DATA SP2D"]) {
+           renderRekapSp2d();
+           showTableLoading(false);
+        } else {
+           google.script.run
+             .withSuccessHandler(function(res) {
+               if(res.success) {
+                 cacheBulkPackage.allContent["DATA SP2D"] = res.data;
+                 renderRekapSp2d();
+               }
+               showTableLoading(false);
+             })
+             .getDataBySheetName("DATA SP2D");
+        }
+      } else {
+        // Sheet Umum
+        if (cacheBulkPackage.allContent[sheetName]) {
+           renderTableUmumView();
+           showTableLoading(false);
+        } else {
+           google.script.run
+             .withSuccessHandler(function(res) {
+               if(res.success) {
+                 cacheBulkPackage.allContent[sheetName] = res.data;
+                 renderTableUmumView();
+               } else {
+                 showToast(res.message, "error");
+               }
+               showTableLoading(false);
+             })
+             .withFailureHandler(err => { showTableLoading(false); showToast("Gagal memuat data", "error"); })
+             .getDataBySheetName(sheetName);
+        }
+      }
+    }
+
+    // ==================================================
+    // RENDERING VIEWS
+    // ==================================================
+    function renderLraView() {
+       const lraData = cacheBulkPackage.allContent["LRA"] || { headers: [], rows: [] };
+       renderLraDenganMesinHitung(lraData.headers, lraData.rows);
+    }
+
+    function renderTableUmumView() {
+       const data = cacheBulkPackage.allContent[currentActiveMenu] || { headers: [], rows: [] };
+       renderTableUmum(data.headers, data.rows);
+    }
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById('main-sidebar');
+      const overlay = document.getElementById('sidebar-overlay');
+      const isMobile = window.innerWidth < 768;
+      if (isMobile) {
+        if (sidebar.classList.contains('-translate-x-full')) {
+          sidebar.classList.remove('-translate-x-full');
+          overlay.classList.remove('hidden');
+          document.body.style.overflow = 'hidden';
+        } else {
+          sidebar.classList.add('-translate-x-full');
+          overlay.classList.add('hidden');
+          document.body.style.overflow = '';
+        }
+      } else {
+        const isCollapsed = sidebar.classList.contains('md:w-20');
+        const logoText = sidebar.querySelector('.sidebar-logo-text');
+        const textElements = sidebar.querySelectorAll('.sidebar-text');
+        if (isCollapsed) {
+          sidebar.classList.remove('md:w-20'); sidebar.classList.add('md:w-64');
+          if (logoText) logoText.classList.remove('hidden');
+          textElements.forEach(el => el.classList.remove('hidden'));
+        } else {
+          sidebar.classList.remove('md:w-64'); sidebar.classList.add('md:w-20');
+          if (logoText) logoText.classList.add('hidden');
+          textElements.forEach(el => el.classList.add('hidden'));
+        }
+      }
+    }
+
+    function openInputModal() {
+      if (currentActiveMenu.toUpperCase().trim() === 'LRA') {
+        const urlSpreadsheet = "https://docs.google.com/spreadsheets/d/1oZPqVHN82LQp7orj_iCzteBE9YYe6fgf9lfYzcw3tzs/edit?usp=sharing";
+        window.open(urlSpreadsheet, '_blank');
+        return;
+      }
+      document.getElementById('form-row-index').value = "";
+      document.getElementById('modal-title').innerText = `Tambah Data Baru: ${currentActiveMenu}`;
+      buildDynamicFormFields();
+      document.getElementById('modal-form').classList.remove('hidden');
+    }
+
+    function closeInputModal() { 
+      document.getElementById('dynamic-form').reset(); 
+      document.getElementById('form-row-index').value = "";
+      document.getElementById('modal-form').classList.add('hidden'); 
+    }
+
+    function buildDynamicFormFields() {
+      const container = document.getElementById('form-fields-container');
+      container.innerHTML = '';
+      const activeMenuUpper = currentActiveMenu.toUpperCase().trim();
+      
+      if (activeMenuUpper === "DATA SP2D") {
+        container.innerHTML = `<div class="flex flex-col"><label class="text-xs font-bold text-slate-600 mb-1">TGL SP2D</label><input type="date" required class="w-full px-3 py-2 border rounded-xl text-xs" name="TGLSP2D"></div><div class="flex flex-col"><label class="text-xs font-bold text-slate-600 mb-1">NO SP2D</label><input type="text" required class="w-full px-3 py-2 border rounded-xl text-xs" name="NO SP2D"></div><div class="flex flex-col"><label class="text-xs font-bold text-slate-600 mb-1">JENIS SP2D</label><select id="field-jenis-sp2d" required class="w-full px-3 py-2 border rounded-xl text-xs bg-white" name="JENIS SP2D"><option value="">-- Pilih --</option></select></div><div class="flex flex-col"><label class="text-xs font-bold text-slate-600 mb-1">TGL PENCAIRAN</label><input type="date" required class="w-full px-3 py-2 border rounded-xl text-xs" name="TGL PENCAIRAN"></div><div class="flex flex-col md:col-span-2"><label class="text-xs font-bold text-amber-600 mb-1">KATEGORI</label><select id="field-kat-alokasi" required class="w-full px-3 py-2 border border-amber-300 bg-amber-50 rounded-xl text-xs" name="KATEGORI_ALOKASI"><option value="">-- Pilih --</option></select></div><div class="flex flex-col md:col-span-2"><label class="text-xs font-bold text-slate-600 mb-1">NILAI</label><input type="number" step="any" required class="w-full px-3 py-2 border rounded-xl text-xs font-mono" name="NILAI"></div>`;
+        const selJenis = document.getElementById('field-jenis-sp2d');
+        cacheBulkPackage.listJenisSp2d.forEach(val => { selJenis.innerHTML += `<option value="${val}">${val}</option>`; });
+        const listKat = ["UP", "Pegawai", "Barang dan Jasa", "Hibah", "Bantuan Sosial", "Modal Tanah", "Modal Peralatan dan Mesin", "Modal Gedung dan Bangunan", "Modal Jalan Jaringan dan Irigasi", "Modal Aset Tetap Lainnya", "Modal Aset Lainnya", "Tidak Terduga", "Bagi Hasil", "Bantuan Keuangan"];
+        const selKat = document.getElementById('field-kat-alokasi');
+        listKat.forEach(k => { selKat.innerHTML += `<option value="${k}">${k}</option>`; });
+      } else if (activeMenuUpper === "PENGURANG BELANJA") {
+        container.innerHTML = `<div class="flex flex-col"><label class="text-xs font-bold text-slate-600 mb-1">TGL BUKTI</label><input type="date" required class="w-full px-3 py-2 border rounded-xl text-xs" name="TGL BUKTI"></div><div class="flex flex-col"><label class="text-xs font-bold text-slate-600 mb-1">NO BUKTI</label><input type="text" required class="w-full px-3 py-2 border rounded-xl text-xs" name="NO BUKTI"></div><div class="flex flex-col md:col-span-2"><label class="text-xs font-bold text-rose-600 mb-1">POS AKUN</label><select id="field-kat-pengurang" required class="w-full px-3 py-2 border border-rose-300 bg-rose-50 rounded-xl text-xs" name="KATEGORI_ALOKASI"><option value="">-- Pilih --</option></select></div><div class="flex flex-col md:col-span-2"><label class="text-xs font-bold text-slate-600 mb-1">NILAI</label><input type="number" step="any" required class="w-full px-3 py-2 border rounded-xl text-xs font-mono" name="NILAI"></div>`;
+        const listKat = ["Pegawai", "Barang dan Jasa", "Hibah", "Bantuan Sosial", "Modal Tanah", "Modal Peralatan dan Mesin", "Modal Gedung dan Bangunan", "Modal Jalan Jaringan dan Irigasi", "Modal Aset Tetap Lainnya", "Modal Aset Lainnya", "Tidak Terduga", "Bagi Hasil", "Bantuan Keuangan"];
+        const selKatP = document.getElementById('field-kat-pengurang');
+        listKat.forEach(k => { selKatP.innerHTML += `<option value="${k}">${k}</option>`; });
+      } else {
+        const headers = cacheBulkPackage.structure[currentActiveMenu] || [];
+        headers.forEach(col => {
+          if(col.toUpperCase() === 'NO' || col.trim() === '') return;
+          container.innerHTML += `<div class="flex flex-col"><label class="text-xs font-semibold text-slate-500 mb-1 uppercase">${col}</label><input type="text" class="w-full px-3 py-2 border rounded-xl text-xs" name="${col}"></div>`;
+        });
+      }
+    }
+
+    function pemicuEditBaris(rowIndex, arrayDataString) {
+      const dataRow = JSON.parse(decodeURIComponent(arrayDataString));
+      const headers = cacheBulkPackage.structure[currentActiveMenu] || [];
+      document.getElementById('form-row-index').value = rowIndex;
+      document.getElementById('modal-title').innerText = `Edit Record Baris #${rowIndex}`;
+      buildDynamicFormFields();
+      const form = document.getElementById('dynamic-form');
+      const activeMenuUpper = currentActiveMenu.toUpperCase().trim();
+      
+      if (activeMenuUpper === "DATA SP2D") {
+        form.querySelector('[name="TGLSP2D"]').value = dataRow[1] || "";
+        form.querySelector('[name="NO SP2D"]').value = dataRow[2] || "";
+        form.querySelector('[name="JENIS SP2D"]').value = dataRow[3] || "";
+        form.querySelector('[name="TGL PENCAIRAN"]').value = dataRow[4] || "";
+        form.querySelector('[name="NILAI"]').value = dataRow[5] || 0;
+        const rincian = ["UP", "Pegawai", "Barang dan Jasa", "Hibah", "Bantuan Sosial", "Modal Tanah", "Modal Peralatan dan Mesin", "Modal Gedung dan Bangunan", "Modal Jalan Jaringan dan Irigasi", "Modal Aset Tetap Lainnya", "Modal Aset Lainnya", "Tidak Terduga", "Bagi Hasil", "Bantuan Keuangan"];
+        let kat = "";
+        rincian.forEach((c, i) => { if (parseFloat(dataRow[6 + i]) > 0) kat = c; });
+        form.querySelector('[name="KATEGORI_ALOKASI"]').value = kat;
+      } else if (activeMenuUpper === "PENGURANG BELANJA") {
+        form.querySelector('[name="TGL BUKTI"]').value = dataRow[1] || "";
+        form.querySelector('[name="NO BUKTI"]').value = dataRow[2] || "";
+        form.querySelector('[name="NILAI"]').value = dataRow[3] || 0;
+        const rincian = ["Pegawai", "Barang dan Jasa", "Hibah", "Bantuan Sosial", "Modal Tanah", "Modal Peralatan dan Mesin", "Modal Gedung dan Bangunan", "Modal Jalan Jaringan dan Irigasi", "Modal Aset Tetap Lainnya", "Modal Aset Lainnya", "Tidak Terduga", "Bagi Hasil", "Bantuan Keuangan"];
+        let kat = "";
+        rincian.forEach((c, i) => { if (parseFloat(dataRow[4 + i]) > 0) kat = c; });
+        form.querySelector('[name="KATEGORI_ALOKASI"]').value = kat;
+      } else {
+        headers.forEach((h, idx) => {
+          const inputEl = form.querySelector(`[name="${h.trim()}"]`);
+          if (inputEl) inputEl.value = dataRow[idx] || "";
+        });
+      }
+      document.getElementById('modal-form').classList.remove('hidden');
+    }
+
+    function pemicuHapusBaris(rowIndex) {
+      if (confirm(`Hapus data baris #${rowIndex}?`)) {
+        showLoading(true, "Menghapus Data...");
+        google.script.run
+          .withSuccessHandler(function(res) {
+            showLoading(false);
+            if(res.success) { 
+              // Update Cache Lokal (Hanya sheet ini)
+              cacheBulkPackage.allContent[currentActiveMenu] = res.freshData.data;
+              
+              // PENTING: Jika kita mengubah SP2D/Pengurang, data LRA jadi tidak valid.
+              // Hapus cache LRA agar next time dibuka akan fetch ulang.
+              if(currentActiveMenu !== "LRA") {
+                 delete cacheBulkPackage.allContent["LRA"]; 
+              }
+
+              switchMenu(currentActiveMenu); // Re-render
+              showToast(res.message, "success"); 
+            } else showToast(res.message, "error");
+          })
+          .withFailureHandler(err => { showLoading(false); showToast("Error: " + err.message, "error"); })
+          .deleteRowData(currentActiveMenu, rowIndex);
+      }
+    }
+
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      showLoading(true, "Menyimpan Data...");
+      const obj = {};
+      document.getElementById('dynamic-form').querySelectorAll('input, select').forEach(i => { if(i.name) obj[i.name] = i.value; });
+      
+      google.script.run
+        .withSuccessHandler(function(res) {
+          showLoading(false);
+          if(res.success) { 
+            closeInputModal(); 
+            // Update Cache Lokal
+            cacheBulkPackage.allContent[currentActiveMenu] = res.freshData.data;
+            
+            // Invalidasi Cache LRA jika bukan di menu LRA
+            if(currentActiveMenu !== "LRA") {
+               delete cacheBulkPackage.allContent["LRA"]; 
+            }
+
+            switchMenu(currentActiveMenu); // Re-render
+            showToast(res.message, "success"); 
+          } else showToast(res.message, "error");
+        })
+        .withFailureHandler(err => { showLoading(false); showToast("Error: " + err.message, "error"); })
+        .saveData(currentActiveMenu, obj);
+    }
+
+    function applyLraServerFilter() {
+      const sDate = document.getElementById('filter-start-date').value;
+      const eDate = document.getElementById('filter-end-date').value;
+      if(!sDate || !eDate) { showToast("Pilih rentang tanggal!", "error"); return; }
+      
+      showLoading(true, "Menghitung...");
+      google.script.run
+        .withSuccessHandler(function(res) {
+          showLoading(false);
+          if(res.success) { 
+            // Update Cache Paket LRA
+            Object.assign(cacheBulkPackage.allContent, res.freshData);
+            switchMenu("LRA"); 
+            showToast("Data Diperbarui!", "success"); 
+          } else { showToast(res.message, "error"); }
+        })
+        .withFailureHandler(err => { showLoading(false); showToast("Error", "error"); })
+        .updateLraFilterDates(sDate, eDate);
+    }
+
+    function cetakLaporan() {
+      const meta = cacheBulkPackage.metaKop;
+      const pejabat = cacheBulkPackage.databasePejabat;
+      const tglMulai = document.getElementById('filter-start-date').value;
+      const tglSelesai = document.getElementById('filter-end-date').value;
+      const formatTgl = (tgl) => { if (!tgl) return "-"; const d = new Date(tgl); return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }); };
+      const ppa = pejabat.find(p => p.kategori.includes("Pengguna Anggaran")) || { nama: "...", nip: "...", jabatan: "..." };
+      const win = window.open('', '_blank');
+      win.document.write(`<html><head><title>Cetak Laporan</title><style>body{font-family:'Times New Roman',serif;padding:40px}.kop{text-align:center;border-bottom:3px double #000;margin-bottom:15px}.kop h2,.kop h3{margin:0;text-transform:uppercase}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #000;padding:8px;font-size:12px}th{background:#f0f0f0;text-align:center}.ttd-container{display:flex;justify-content:flex-end;margin-top:50px}.ttd-box{width:40%;text-align:center}.space-ttd{height:80px}</style></head><body><div class="kop"><h3>${meta.dinas}</h3><h2>${meta.laporan}</h2><p>TAHUN ${meta.tahun}</p></div><table><thead><tr><th>Kode</th><th>Uraian</th><th>Anggaran</th><th>Realisasi</th><th>(%)</th><th>Sisa</th></tr></thead><tbody>${document.getElementById('data-table').querySelector('tbody').innerHTML}</tbody></table><div class="ttd-container"><div class="ttd-box"><p>Samarinda, ${formatTgl(new Date())}</p><p>${ppa.jabatan}</p><div class="space-ttd"></div><p><strong>${ppa.nama}</strong></p><p>NIP. ${ppa.nip}</p></div></div></body></html>`);
+      win.document.close();
+      setTimeout(() => { win.print(); }, 500);
+    }
+
+    // ==================================================
+    // RENDER FUNCTIONS (LOGIKA TETAP SAMA)
+    // ==================================================
+    function renderTableUmum(headers, rows) {
+      const table = document.getElementById('data-table');
+      table.innerHTML = '<thead></thead><tbody></tbody>';
+      let trHead = '<tr class="bg-slate-100 border-b">';
+      headers.forEach(h => { if(h.trim() !== "") trHead += `<th class="px-5 py-3 text-xs font-bold text-slate-600">${h}</th>`; });
+      trHead += '<th class="px-5 py-3 text-xs font-bold text-slate-600 action-column text-center">AKSI</th></tr>';
+      table.querySelector('thead').innerHTML = trHead;
+      let tbodyHtml = '';
+      rows.forEach(row => {
+        const realSheetRowIndex = row[row.length - 1]; 
+        const stringEncodedRow = encodeURIComponent(JSON.stringify(row));
+        let trBody = '<tr class="border-b hover:bg-slate-50">';
+        headers.forEach((h, idx) => { if(h.trim() !== "") trBody += `<td class="px-5 py-3 text-xs">${row[idx] || ''}</td>`; });
+        trBody += `<td class="px-5 py-3 text-xs text-center action-column"><button onclick="pemicuEditBaris(${realSheetRowIndex}, '${stringEncodedRow}')" class="px-2 py-1 bg-amber-500 text-white rounded-md mr-1">Edit</button><button onclick="pemicuHapusBaris(${realSheetRowIndex})" class="px-2 py-1 bg-rose-500 text-white rounded-md">Hapus</button></td>`;
+        tbodyHtml += trBody + '</tr>';
+      });
+      table.querySelector('tbody').innerHTML = tbodyHtml;
+    }
+
+    function renderLraDenganMesinHitung(headersLra, rowsLra) {
+      const table = document.getElementById('data-table');
+      table.innerHTML = '<thead></thead><tbody></tbody>';
+      const sp2dPackage = cacheBulkPackage.allContent["DATA SP2D"] || { rows: [] };
+      const pengurangPackage = cacheBulkPackage.allContent["PENGURANG BELANJA"] || { rows: [] }; 
+      const headersPengurang = cacheBulkPackage.structure["PENGURANG BELANJA"] || [];
+      const filterStart = document.getElementById('filter-start-date').value;
+      const filterEnd = document.getElementById('filter-end-date').value;
+      
+      let trHead = '<tr class="bg-slate-100 border-b">';
+      ["Kode", "Uraian", "Anggaran", "Realisasi", "(%)", "Lebih/Kurang"].forEach(h => { trHead += `<th class="px-5 py-3 text-xs font-bold text-slate-600">${h}</th>`; });
+      table.querySelector('thead').innerHTML = trHead + '</tr>';
+      
+      const kategoriSp2d = ["UP", "Pegawai", "Barang dan Jasa", "Hibah", "Bantuan Sosial", "Modal Tanah", "Modal Peralatan dan Mesin", "Modal Gedung dan Bangunan", "Modal Jalan Jaringan dan Irigasi", "Modal Aset Tetap Lainnya", "Modal Aset Lainnya", "Tidak Terduga", "Bagi Hasil", "Bantuan Keuangan"];
+      let akumulasi = { "5.1": { anggaran: 0, realisasi: 0 }, "5.2": { anggaran: 0, realisasi: 0 }, "5.3": { anggaran: 0, realisasi: 0 }, "5.4": { anggaran: 0, realisasi: 0 }, "5": { anggaran: 0, realisasi: 0 } };
+      let listBarisData = [];
+      
+      rowsLra.forEach((row) => {
+        let kodeLra = row[0] ? row[0].toString().trim() : "";
+        let uraianLra = row[1] ? row[1].toString().trim() : "";
+        let anggaranLra = parseFloat(row[2]) || 0;
+        if (!kodeLra.startsWith("5") || uraianLra.toLowerCase().includes("total")) return;
+        
+        let totalSp2d = 0, totalPengurang = 0;
+        let brentang = kodeLra.split('.').length;
+        
+        if (brentang === 3) {
+          sp2dPackage.rows.forEach(sRow => {
+            let tglPencairan = sRow[4] ? sRow[4].toString().trim().substring(0, 10) : "";
+            if(tglPencairan >= filterStart && tglPencairan <= filterEnd) {
+              kategoriSp2d.forEach((kat, idx) => { if(uraianLra.toLowerCase().includes(kat.toLowerCase())) { totalSp2d += parseFloat(sRow[6 + idx]) || 0; } });
+            }
+          });
+          pengurangPackage.rows.forEach(pRow => {
+            let tglPengurang = pRow[1] ? pRow[1].toString().trim().substring(0, 10) : "";
+            if(tglPengurang >= filterStart && tglPengurang <= filterEnd) {
+              kategoriSp2d.forEach((kat) => {
+                if(uraianLra.toLowerCase().includes(kat.toLowerCase())) {
+                  let indeksKolomDinamis = headersPengurang.findIndex(h => h.toString().toLowerCase().includes(kat.toLowerCase()));
+                  if (indeksKolomDinamis !== -1) { totalPengurang += parseFloat(pRow[indeksKolomDinamis]) || 0; }
+                }
+              });
+            }
+          });
+        }
+        
+        let realisasiNetto = totalSp2d - totalPengurang;
+        if (brentang === 3) {
+          let indukDuaDigit = kodeLra.substring(0, 3);
+          if (akumulasi[indukDuaDigit]) { akumulasi[indukDuaDigit].anggaran += anggaranLra; akumulasi[indukDuaDigit].realisasi += realisasiNetto; }
+          akumulasi["5"].anggaran += anggaranLra; akumulasi["5"].realisasi += realisasiNetto;
+        }
+        listBarisData.push({ kode: kodeLra, uraian: uraianLra, anggaran: anggaranLra, realisasi: realisasiNetto, brentang: brentang });
+      });
+      
+      let tbodyHtml = '';
+      listBarisData.forEach(item => {
+        let finalAnggaran = item.anggaran, finalRealisasi = item.realisasi;
+        let isInduk = item.brentang < 3;
+        if (isInduk && akumulasi[item.kode]) { finalAnggaran = akumulasi[item.kode].anggaran; finalRealisasi = akumulasi[item.kode].realisasi; }
+        let sisa = finalAnggaran - finalRealisasi;
+        let persen = finalAnggaran > 0 ? (finalRealisasi / finalAnggaran) * 100 : 0;
+        let textClass = isInduk ? "font-bold text-slate-900 bg-slate-50" : "";
+        tbodyHtml += `<tr class="border-b hover:bg-slate-100 ${textClass}">
+          <td class="px-5 py-3 text-xs">${item.kode}</td><td class="px-5 py-3 text-xs">${item.uraian}</td>
+          <td class="px-5 py-3 text-xs">${finalAnggaran.toLocaleString('id-ID')}</td>
+          <td class="px-5 py-3 text-xs ${isInduk ? '' : 'text-indigo-600 font-semibold'}">${finalRealisasi.toLocaleString('id-ID')}</td>
+          <td class="px-5 py-3 text-xs">${persen.toFixed(2)}%</td>
+          <td class="px-5 py-3 text-xs font-bold ${sisa < 0 ? 'text-red-600' : 'text-emerald-600'}">${sisa.toLocaleString('id-ID')}</td>
+        </tr>`;
+      });
+      
+      let totalBelanjaAnggaran = akumulasi["5"].anggaran, totalBelanjaRealisasi = akumulasi["5"].realisasi;
+      let totalBelanjaSisa = totalBelanjaAnggaran - totalBelanjaRealisasi;
+      let totalBelanjaPersen = totalBelanjaAnggaran > 0 ? (totalBelanjaRealisasi / totalBelanjaAnggaran) * 100 : 0;
+      tbodyHtml += `<tr class="border-b font-bold text-slate-900 bg-slate-100">
+        <td class="px-5 py-3 text-xs"></td><td class="px-5 py-3 text-xs">Total Belanja</td>
+        <td class="px-5 py-3 text-xs">${totalBelanjaAnggaran.toLocaleString('id-ID')}</td>
+        <td class="px-5 py-3 text-xs">${totalBelanjaRealisasi.toLocaleString('id-ID')}</td>
+        <td class="px-5 py-3 text-xs">${totalBelanjaPersen.toFixed(2)}%</td>
+        <td class="px-5 py-3 text-xs ${totalBelanjaSisa < 0 ? 'text-red-600' : 'text-emerald-600'}">${totalBelanjaSisa.toLocaleString('id-ID')}</td>
+      </tr>`;
+      table.querySelector('tbody').innerHTML = tbodyHtml;
+    }
+
+    function applyLocalSearch() {
+      const val = document.getElementById('table-search').value.toLowerCase();
+      const origin = cacheBulkPackage.allContent[currentActiveMenu] || { rows: [] };
+      const filtered = origin.rows.filter(row => row.some(c => c.toString().toLowerCase().includes(val)));
+      if (currentActiveMenu.toUpperCase().trim() === 'LRA') renderLraDenganMesinHitung([], filtered);
+      else renderTableUmum(cacheBulkPackage.structure[currentActiveMenu], filtered);
+    }
+
+    function renderRekapSp2d() {
+      const table = document.getElementById('data-table');
+      table.innerHTML = '<thead></thead><tbody></tbody>';
+      const sp2d = cacheBulkPackage.allContent["DATA SP2D"] || { rows: [] };
+      const startDate = document.getElementById('filter-start-date').value;
+      const endDate = document.getElementById('filter-end-date').value;
+      table.querySelector('thead').innerHTML = `<tr class="bg-slate-100 border-b">
+        <th class="px-5 py-3 text-xs font-bold text-slate-600 w-16 text-center">NO</th>
+        <th class="px-5 py-3 text-xs font-bold text-slate-600">JENIS SP2D</th>
+        <th class="px-5 py-3 text-xs font-bold text-slate-600 text-right w-48">NILAI</th></tr>`;
+      const jenisListManual = ["Uang Persediaan (UP)", "Ganti Uang Persediaan (GU)", "Langsung (LS)", "Tambah Uang Persediaan (TU)", "Nihil"];
+      let html = '', grandTotalNilai = 0;
+      jenisListManual.forEach((jenisText, index) => {
+        let totalNilaiSp2d = 0;
+        sp2d.rows.forEach(r => {
+          const jenisDiSheet = (r[3] || '').toString().trim();
+          const tanggalPencairan = (r[4] || '').toString().substring(0, 10);
+          const nilaiRupiahGlobal = parseFloat(r[5]) || 0;
+          if (jenisDiSheet.toLowerCase() === jenisText.toLowerCase() && tanggalPencairan >= startDate && tanggalPencairan <= endDate) {
+            totalNilaiSp2d += nilaiRupiahGlobal;
+          }
+        });
+        grandTotalNilai += totalNilaiSp2d;
+        let warnaAngka = totalNilaiSp2d > 0 ? "text-indigo-600 font-semibold" : "text-slate-400";
+        html += `<tr class="border-b hover:bg-slate-50">
+          <td class="px-5 py-3 text-xs text-center text-slate-500">${index + 1}</td>
+          <td class="px-5 py-3 text-xs font-medium text-slate-700">${jenisText}</td>
+          <td class="px-5 py-3 text-xs text-right font-mono ${warnaAngka}">${totalNilaiSp2d.toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+        </tr>`;
+      });
+      html += `<tr class="bg-slate-100 font-bold border-t border-slate-300">
+        <td class="px-5 py-3 text-xs text-center text-slate-900"></td>
+        <td class="px-5 py-3 text-xs text-slate-900 uppercase tracking-wider">Total Rekap</td>
+        <td class="px-5 py-3 text-xs text-right font-mono text-emerald-600">${grandTotalNilai.toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+      </tr>`;
+      table.querySelector('tbody').innerHTML = html;
+    }
+  </script>
+</body>
+</html>
